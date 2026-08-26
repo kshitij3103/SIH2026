@@ -1,4 +1,4 @@
-control_id,name,effectiveness,cost_usd
+control_id,name,risk_reduction_pct,cost_usd
 CTRL-01,Endpoint Detection & Response (EDR),0.85,50000
 CTRL-02,Multi-Factor Authentication (MFA),0.95,20000
 CTRL-03,Network Segmentation,0.7,80000

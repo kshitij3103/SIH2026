@@ -16,11 +16,20 @@ def generate_assets(num_assets=50):
         # Financial impact if asset is compromised (in USD)
         value = criticality * random.randint(10000, 100000)
         downtime_cost = criticality * random.randint(1000, 5000)
+        
+        if criticality >= 4:
+            sensitivity = random.choice(["Confidential", "Restricted"])
+        elif criticality == 3:
+            sensitivity = "Internal"
+        else:
+            sensitivity = "Public"
+            
         assets.append({
             "asset_id": f"AST-{1000+i}",
             "hostname": f"host-{random.randint(10,99)}-{business_units[random.randint(0,4)].lower()}.internal",
             "business_unit": random.choice(business_units),
             "criticality": criticality,
+            "data_sensitivity_tier": sensitivity,
             "financial_value_usd": value,
             "downtime_cost_per_hour_usd": downtime_cost,
             "regulatory_penalty_potential_usd": random.choice([0, 50000, 250000, 1000000]) if criticality >= 4 else 0,
@@ -34,6 +43,8 @@ def generate_vulnerabilities(assets, num_vulns=100):
     for i in range(num_vulns):
         cve = random.choice(cve_list)
         cvss = round(random.uniform(2.0, 10.0), 1)
+        # EPSS Score: Exploit Probability (0 to 1)
+        epss = round(random.uniform(0.01, 0.95), 3) if cvss > 5.0 else round(random.uniform(0.001, 0.1), 3)
         
         if cvss < 4.0: severity = "Low"
         elif cvss < 7.0: severity = "Medium"
@@ -45,6 +56,7 @@ def generate_vulnerabilities(assets, num_vulns=100):
             "asset_id": random.choice(assets)["asset_id"],
             "cve_id": cve,
             "cvss_score": cvss,
+            "epss_score": epss,
             "severity": severity,
             "status": random.choice(["Open", "In Progress", "Risk Accepted"]),
             "discovery_date": (datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 100))).isoformat()
@@ -54,7 +66,7 @@ def generate_vulnerabilities(assets, num_vulns=100):
 def generate_threat_events(assets, num_events=200):
     """
     Simulates parsed events from datasets like splunk/attack_data.
-    Instead of raw logs, these are the aggregated 'alerts' or 'threats' detected.
+    This acts as historical incident data to train the likelihood model.
     """
     events = []
     attack_types = [
@@ -93,17 +105,38 @@ def generate_threat_events(assets, num_events=200):
 
 def generate_controls():
     return [
-        {"control_id": "CTRL-01", "name": "Endpoint Detection & Response (EDR)", "effectiveness": 0.85, "cost_usd": 50000},
-        {"control_id": "CTRL-02", "name": "Multi-Factor Authentication (MFA)", "effectiveness": 0.95, "cost_usd": 20000},
-        {"control_id": "CTRL-03", "name": "Network Segmentation", "effectiveness": 0.70, "cost_usd": 80000},
-        {"control_id": "CTRL-04", "name": "Regular Patching Program", "effectiveness": 0.80, "cost_usd": 30000},
+        {"control_id": "CTRL-01", "name": "Endpoint Detection & Response (EDR)", "risk_reduction_pct": 0.85, "cost_usd": 50000},
+        {"control_id": "CTRL-02", "name": "Multi-Factor Authentication (MFA)", "risk_reduction_pct": 0.95, "cost_usd": 20000},
+        {"control_id": "CTRL-03", "name": "Network Segmentation", "risk_reduction_pct": 0.70, "cost_usd": 80000},
+        {"control_id": "CTRL-04", "name": "Regular Patching Program", "risk_reduction_pct": 0.80, "cost_usd": 30000},
     ]
+
+def generate_asset_controls(assets, controls):
+    """
+    Creates a mapping of which controls are CURRENTLY deployed on which assets.
+    This provides the baseline for residual risk calculation and future optimization.
+    """
+    deployed_controls = []
+    for asset in assets:
+        # Randomly deploy 0 to 3 controls per asset
+        num_controls = random.randint(0, 3)
+        selected_controls = random.sample(controls, num_controls)
+        for ctrl in selected_controls:
+            deployed_controls.append({
+                "mapping_id": f"MAP-{uuid.uuid4().hex[:8]}",
+                "asset_id": asset["asset_id"],
+                "control_id": ctrl["control_id"],
+                "status": "Deployed",
+                "deployment_date": (datetime.datetime.now() - datetime.timedelta(days=random.randint(30, 365))).isoformat()
+            })
+    return deployed_controls
 
 def main():
     assets = generate_assets(50)
     vulns = generate_vulnerabilities(assets, 120)
     events = generate_threat_events(assets, 300)
     controls = generate_controls()
+    asset_controls = generate_asset_controls(assets, controls)
 
     dataset = {
         "metadata": {
@@ -113,7 +146,8 @@ def main():
         "assets": assets,
         "vulnerabilities": vulns,
         "threat_events": events,
-        "controls": controls
+        "controls": controls,
+        "asset_controls": asset_controls
     }
 
     output_dir = Path("c:/Users/Kshitij/Desktop/SIH/data")
@@ -133,12 +167,14 @@ def main():
     write_csv("vulnerabilities.csv", vulns)
     write_csv("threat_events.csv", events)
     write_csv("controls.csv", controls)
+    write_csv("asset_controls.csv", asset_controls)
         
     print(f"Dataset successfully compiled and saved as CSV files in {output_dir}")
     print(f"Total Assets: {len(assets)}")
     print(f"Total Vulnerabilities: {len(vulns)}")
     print(f"Total Threat Events: {len(events)}")
     print(f"Total Controls: {len(controls)}")
+    print(f"Total Asset-Control Mappings: {len(asset_controls)}")
 
 if __name__ == "__main__":
     main()
