@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import RedirectResponse
 import pandas as pd
 import numpy as np
 
@@ -19,6 +20,15 @@ def load_parquet(filename: str) -> pd.DataFrame:
     if not file_path.exists():
         raise FileNotFoundError(f"Output file not found: {file_path}. Have you run the pipeline?")
     return pd.read_parquet(file_path)
+
+# @app.get("/")
+# def root():
+#     return {"message": "Cyber Risk Quantification API is running. Visit /docs for API documentation."}
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/docs")
 
 @app.get("/health")
 def health_check():
