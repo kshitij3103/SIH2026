@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 
 import pandas as pd
@@ -78,12 +76,7 @@ def optimize_investments(
 
 
 def _greedy_baseline(df: pd.DataFrame, budget_usd: float) -> dict:
-    """
-    Naive baseline: sort by ROSI descending, buy until budget runs out.
-    Used only to show the ILP optimizer's improvement over the 'obvious'
-    approach in the demo -- greedy-by-ROSI is provably suboptimal for
-    0/1 knapsack (it can leave budget on the table or miss better combos).
-    """
+
     ranked = df.sort_values("ROSI", ascending=False)
     spent, gained, chosen_idx = 0.0, 0.0, []
     for i, row in ranked.iterrows():
