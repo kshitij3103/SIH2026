@@ -90,7 +90,7 @@ def _greedy_baseline(df: pd.DataFrame, budget_usd: float) -> dict:
         "n_actions_selected": len(chosen_idx),
     }
 
-
+#parquet wrapper for consistency with the rest of the pipeline
 def run_from_parquet(
     scenario_path: str = "outputs/control_scenario_results.parquet",
     budget_usd: float = 5_000_000,
