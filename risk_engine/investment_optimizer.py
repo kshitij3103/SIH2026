@@ -1,24 +1,4 @@
-"""
-risk_engine/investment_optimizer.py
 
-Phase 4: Budget-constrained security investment optimization.
-
-Consumes the output of control_scenarios.py (control_scenario_results.parquet)
-and answers: "Given a budget B, which (asset, control) actions maximize total
-expected risk reduction (USD), subject to total cost <= B?"
-
-This is a 0/1 knapsack problem, solved exactly as an Integer Linear Program
-(one binary variable per candidate action). ILP is used instead of the
-classic DP knapsack table because costs/budget are real dollar amounts
-(millions), not small integers -- a DP table indexed by dollar-budget would
-be far too large. PuLP's CBC solver handles hundreds of binary variables
-instantly.
-
-Design choice: this module does NOT re-derive risk numbers. It trusts
-Risk_Reduction_usd and cost_usd exactly as produced by control_scenarios.py
-(which already accounts for control_resistance / additive_capped overlap
-within an asset). It only decides WHICH subset to buy.
-"""
 
 from __future__ import annotations
 
