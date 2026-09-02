@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #F7F5F0;
+  --bg-surface: #FFFFFF;
+  --ink-900: #1C1B22;
+  --ink-600: #4A4852;
+  --accent-primary: #0F5C42;
+  --accent-gold: #9A7B2F;
+  --risk-critical: #A32B2B;
+  --risk-moderate: #B8752B;
+  --risk-low: #3D7A52;
+  --border: #E4E0D6;
+}
+
+@layer base {
+  @layer base {
+    body {
+      background-color: var(--bg-primary);
+      color: var(--ink-900);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    .font-editorial {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      letter-spacing: -0.015em;
+    }
+  }
+}
+
+/* Hairline borders & warm scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F7F5F0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E4E0D6;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C8C4B7;
+}
