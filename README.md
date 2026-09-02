@@ -1,79 +1,76 @@
-# Cyber Risk Quantification & Investment Optimization Platform
+# AI-Powered Continuous Cyber Risk Quantification & Investment Optimization Platform
 
 **SIH Problem Statement 26105**
 
-An enterprise-grade, **FAIR-aligned** Cyber Risk Quantification (CRQ) and decision-support platform. It converts raw technical cybersecurity telemetry (vulnerabilities, threat events, deployed controls) into **defensible financial risk metrics** — Expected Annual Loss (EAL), Value at Risk (VaR95 / VaR99), and Return on Security Investment (ROSI) — enabling CISOs, risk officers, and executive leadership to make data-driven, budget-constrained security investment decisions instead of relying on qualitative "Low/Medium/High" risk heatmaps.
+A board-ready platform that quantifies cyber risk in **financial terms** (not qualitative "High/Medium/Low" scores), using an **Open FAIR™-aligned Monte Carlo engine**, and recommends the mathematically optimal allocation of a security budget across controls via an **Integer Linear Programming (ILP) knapsack optimizer**. Includes a RAG-grounded chat assistant for board/stakeholder Q&A over the live risk data.
 
 ---
 
-## System Architecture
+## Table of Contents
+
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Risk Calculation Engine](#risk-calculation-engine-backendrisk_engine)
+- [Investment Optimizer](#investment-optimizer)
+- [AI Chat Assistant](#ai-chat-assistant)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [Environment Variables](#environment-variables)
+- [Model Limitations](#model-limitations)
+
+---
+
+## Overview
+
+Most cyber risk dashboards stop at qualitative heat maps. This platform goes further:
+
+- Every asset's risk is expressed as a **distribution of possible annual financial loss** (Expected Annual Loss, VaR95, VaR99) via 10,000-iteration Monte Carlo simulation.
+- Every control's value is expressed as a **Return on Security Investment (ROSI)**.
+- Budget allocation across controls is solved as a **true combinatorial optimization problem**, not a greedy heuristic — with a side-by-side comparison showing the dollar value the exact solver captures over naive prioritization.
+- A grounded chat assistant lets stakeholders ask natural-language questions and get answers sourced strictly from the computed risk data (with live optimizer runs for budget questions, not LLM guesses).
+
+## Key Features
+
+- 📊 **Executive Overview** — organization-wide EAL, VaR95, VaR99 with exceedance probabilities
+- 🗂️ **Asset Portfolio** — per-asset EAL/VaR, criticality, priority score, filterable by business unit
+- 🛡️ **Investment Optimizer** — Knapsack ILP solver vs. naive greedy baseline, with recommended (asset, control) action plan
+- 💬 **AI Risk Analyst Chatbot** — RAG-grounded Q&A over live risk data, with real ILP invocation for budget questions
+- 🧮 **Standards-based methodology** — every formula traceable to FIRST.org EPSS/CVSS, Open FAIR, and cited breach-cost benchmarks
+
+## Architecture
 
 ```
-SIH2026/
-├── backend/                  # FastAPI + FAIR Monte Carlo Risk Engine + ILP Optimizer
-│   ├── api/
-│   │   ├── main.py           # Core REST API (endpoints for risk metrics & optimizer)
-│   │   └── chat.py           # /chat endpoint with AI RAG context-stuffing
-│   ├── risk_engine/          # FAIR Monte Carlo simulation & PuLP ILP knapsack solver
-│   │   ├── ingest.py         # CSV ingestion & asset base table creation
-│   │   ├── likelihood.py     # EPSS annualization & CVSS vulnerability factor
-│   │   ├── frequency.py      # Threat Event Frequency (TEF) modeling
-│   │   ├── loss_magnitude.py # Primary & Secondary lognormal loss calibration
-│   │   ├── simulate.py       # Vectorized Monte Carlo simulation engine
-│   │   ├── aggregate.py      # EAL, VaR95, VaR99 calculation & rollups
-│   │   ├── control_scenarios.py # Before/after control ROSI simulations
-│   │   ├── investment_optimizer.py # Knapsack ILP vs greedy solver
-│   │   └── config.py         # Tunable mathematical parameters & benchmarks
-│   ├── data/                 # Relational cybersecurity telemetry dataset (5 CSVs)
-│   ├── outputs/              # Quantified risk parquet datasets (EAL, VaR95, VaR99, ROSI)
-│   ├── tests/                # Pytest validation test suite
-│   ├── requirements.txt      # Python dependencies
-│   └── .env.example          # Environment template (HF_TOKEN)
-│
-├── frontend/                 # React 18 + Vite + TailwindCSS + Recharts Dashboard
-│   ├── src/
-│   │   ├── api/client.js     # Axios API client & financial formatters
-│   │   ├── hooks/useApi.js   # Centralized data fetching, loading & error hook
-│   │   ├── components/
-│   │   │   ├── dashboard/    # ExecutiveSummary, BusinessUnitChart, AssetRiskTable,
-│   │   │   │                 # AssetDetailPanel, ControlsROIChart, WhatIfOptimizer
-│   │   │   ├── chatbot/      # ChatWidget, ChatWindow, ChatMessage, BotLogo
-│   │   │   └── layout/       # Header, navigation tabs, health monitor
-│   │   ├── App.jsx           # Dashboard root
-│   │   └── index.css         # Tailwind & custom styling
-│   ├── package.json
-│   └── .env.example          # VITE_API_BASE_URL=http://localhost:8000
-│
-└── README.md
+                        ┌─────────────────────────┐
+                        │   Frontend Dashboard     │
+                        │ (Executive / Assets /    │
+                        │  Optimizer / Chat panel) │
+                        └────────────┬─────────────┘
+                                     │ REST (JSON)
+                        ┌────────────▼─────────────┐
+                        │   FastAPI Backend (api/)  │
+                        │  main.py — REST endpoints │
+                        │  chat.py — RAG chat route │
+                        └────────────┬─────────────┘
+                                     │
+                 ┌───────────────────┼───────────────────┐
+                 ▼                   ▼                   ▼
+        ┌────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+        │  risk_engine/   │ │ investment_       │ │  Hugging Face     │
+        │  Monte Carlo    │ │ optimizer.py      │ │  Router (LLM)     │
+        │  FAIR pipeline  │ │  (ILP / Knapsack) │ │  DeepSeek model    │
+        └────────┬────────┘ └────────┬─────────┘ └──────────────────┘
+                 │                   │
+                 ▼                   ▼
+        ┌─────────────────────────────────────┐
+        │   outputs/*.parquet                  │
+        │   org_risk_summary, business_unit_,  │
+        │   asset_risk_summary,                │
+        │   control_scenario_results           │
+        └───────────────────────────────────────┘
 ```
-
----
-
-## Dataset (`backend/data/`)
-
-A simulated, relational dataset representing the technical telemetry and business context required to model cyber risk financially — 5 interconnected CSV files:
-
-### 1. `assets.csv` — Business Context
-`asset_id, hostname, business_unit, criticality (1-5), data_sensitivity_tier, financial_value_usd, downtime_cost_per_hour_usd, regulatory_penalty_potential_usd, os`
-Defines the intrinsic value and potential loss magnitude (in USD) if an asset is compromised.
-
-### 2. `vulnerabilities.csv` — Technical Weaknesses
-`vuln_id, asset_id (FK), cve_id, cvss_score, epss_score, severity, status, discovery_date`
-Feeds the Likelihood and Vulnerability-factor calculations. `epss_score` (FIRST.org's Exploit Prediction Scoring System) provides a real, externally-maintained probability of exploitation — not a guess.
-
-### 3. `threat_events.csv` — Historical Incident Data
-`event_id, timestamp, asset_id (FK), mitre_technique_id, description, severity, source_ip, action_taken, downtime_hours_caused, records_compromised`
-Simulated SIEM-style alert log providing the empirical basis for Threat Event Frequency and for downtime/records-exposed inputs to Loss Magnitude.
-
-### 4. `controls.csv` — Mitigation Catalog
-`control_id, name, risk_reduction_pct, cost_usd`
-The catalog of available security defenses (MFA, EDR, Network Segmentation, Patching) with their cost and effectiveness — the cost-benefit inputs for the optimization module.
-
-### 5. `asset_controls.csv` — Deployed Defenses
-`mapping_id, asset_id (FK), control_id (FK), status, deployment_date`
-Maps which controls are currently active on which assets — required to compute *residual* risk (risk after existing defenses), not raw/unmitigated risk.
-
----
 
 ## Risk Calculation Engine (`backend/risk_engine/`)
 
@@ -81,28 +78,67 @@ The engine implements an **Open FAIR™-aligned, Monte Carlo-based** methodology
 
 ### Pipeline Stages
 
-1. **Ingestion & Normalization (`ingest.py`)**:
+1. **Ingestion & Normalization (`ingest.py`)**
    Joins the 5 raw CSVs into a single `asset_risk_base` table keyed on `asset_id` — one row per asset with aggregated vulnerability lists, event counts, and active controls.
 
-2. **Likelihood (`likelihood.py`)**:
+2. **Likelihood (`likelihood.py`)**
+
    - **EPSS annualization**: EPSS scores a 30-day window. The engine annualizes it via the survival-probability formula:
-     $$\text{P\_annual} = 1 - (1 - \text{EPSS\_30day})^{\frac{365}{30}}$$
-   - **CVSS normalization**: $\text{severity\_norm} = \frac{\text{cvss\_score}}{10}$, kept as an orthogonal 0–1 dimension from probability.
+
+     $$
+     P_{\text{annual}} = 1 - (1 - \text{EPSS}_{30\text{day}})^{\frac{365}{30}}
+     $$
+
+   - **CVSS normalization**:
+
+     $$
+     \text{severity}_{\text{norm}} = \frac{\text{CVSS}_{\text{score}}}{10}
+     $$
+
+     Kept as an orthogonal 0–1 dimension from probability.
+
    - **Vulnerability factor**: Combines annualized exploit probability, severity, and active control resistance per CVE, taking the **maximum across an asset's CVEs** (weakest link principle):
-     $$\text{control\_resistance} = \min(1, \text{total\_risk\_reduction\_pct})$$
-     $$\text{vuln\_per\_cve} = P_{\text{annual\_exploit}} \times \text{severity\_norm} \times (1 - \text{control\_resistance})$$
-     $$\text{Vuln\_asset} = \max_{\text{cve} \in \text{asset}} (\text{vuln\_per\_cve})$$
 
-3. **Threat Event Frequency — TEF (`frequency.py`)**:
-   Derived empirically from `threat_events.csv` as a **triangular distribution** ($\text{TEF}_{\text{min}}, \text{TEF}_{\text{ml}}, \text{TEF}_{\text{max}}$). If an asset has $<3$ historical events, its business unit's aggregate event-rate distribution is borrowed.
+     $$
+     \text{control}_{\text{resistance}} = \min\left(1, \text{total risk reduction}_{\%}\right)
+     $$
 
-4. **Loss Magnitude (`loss_magnitude.py`)**:
-   - **Primary Loss** (Internal): $\text{downtime\_cost\_per\_hour} \times \text{downtime\_hours} + \text{IR\_flat\_cost}$
-   - **Secondary Loss** (Benchmark-calibrated): $\text{sensitivity\_multiplier} \times \text{per\_record\_cost} \times \text{records\_compromised} + \text{regulatory\_penalty}$
-   - Combined into a **lognormal distribution** ($\sigma=0.75$, configurable) to accurately reflect right-skewed heavy tail losses.
+     $$
+     \text{vuln}_{\text{per-CVE}} = P_{\text{annual exploit}} \times \text{severity}_{\text{norm}} \times (1 - \text{control}_{\text{resistance}})
+     $$
 
-5. **Monte Carlo Simulation (`simulate.py`)**:
+     $$
+     \text{Vuln}_{\text{asset}} = \max_{\text{CVE} \in \text{asset}} \left(\text{vuln}_{\text{per-CVE}}\right)
+     $$
+
+3. **Threat Event Frequency — TEF (`frequency.py`)**
+   Derived empirically from `threat_events.csv` as a **triangular distribution**:
+
+   $$
+   \text{TEF}_{\text{min}}, \quad \text{TEF}_{\text{ml}}, \quad \text{TEF}_{\text{max}}
+   $$
+
+   If an asset has fewer than 3 historical events, its business unit's aggregate event-rate distribution is borrowed.
+
+4. **Loss Magnitude (`loss_magnitude.py`)**
+
+   - **Primary Loss** (Internal):
+
+     $$
+     \text{Primary Loss} = (\text{downtime cost per hour} \times \text{downtime hours}) + \text{IR flat cost}
+     $$
+
+   - **Secondary Loss** (Benchmark-calibrated):
+
+     $$
+     \text{Secondary Loss} = (\text{sensitivity multiplier} \times \text{per-record cost} \times \text{records compromised}) + \text{regulatory penalty}
+     $$
+
+   - Combined into a **lognormal distribution** ($\sigma = 0.75$, configurable) to accurately reflect right-skewed, heavy-tail losses.
+
+5. **Monte Carlo Simulation (`simulate.py`)**
    Vectorized (NumPy) simulation running thousands of iterations per asset:
+
    ```python
    tef_sample  = triangular(TEF_min, TEF_ml, TEF_max)
    vuln_sample = beta(a, b)                          # mean ≈ Vuln_asset
@@ -110,149 +146,125 @@ The engine implements an **Open FAIR™-aligned, Monte Carlo-based** methodology
    annual_loss = lef_sample * loss_magnitude_sample  # per iteration
    ```
 
-6. **Aggregation & Summary Metrics (`aggregate.py`)**:
-   - **EAL** (Expected Annual Loss): Mean of the distribution ("typical year" loss).
-   - **VaR95 / VaR99** (Value at Risk): 95th and 99th percentiles ("bad year" and catastrophic tail loss).
-   - **Priority Score**: $\text{priority\_score} = \text{EAL} \times (\text{criticality} / 5)$ for visual ranking.
+   Outputs are aggregated into `org_risk_summary.parquet`, `business_unit_risk_summary.parquet`, and `asset_risk_summary.parquet` — each carrying `EAL_usd`, `VaR95_usd`, `VaR99_usd`, and a `priority_score`.
 
-7. **Control Scenario Simulation (`control_scenarios.py`)**:
-   For every candidate control not already deployed on an asset, the engine re-runs the simulation twice:
-   $$\text{Risk\_Reduction\_usd} = \text{EAL}_{\text{before}} - \text{EAL}_{\text{after}}$$
-   $$\text{ROSI} = \frac{\text{Risk\_Reduction\_usd}}{\text{cost\_usd}}$$
+## Investment Optimizer
 
-8. **Investment Optimizer (`investment_optimizer.py`)**:
-   Solves the budget-constrained knapsack problem using Integer Linear Programming (PuLP / CBC solver) to select the optimal set of asset-control pairs, comparing directly against a naive greedy-by-ROSI baseline.
+`risk_engine/investment_optimizer.py` solves a **budget-constrained knapsack problem** using Integer Linear Programming (`pulp`):
 
----
+- **Inputs**: `control_scenario_results.parquet` (per asset-control pair: `cost_usd`, `Risk_Reduction_usd`), a budget in USD, and a `one_control_per_asset` constraint flag.
+- **Objective**: maximize total risk reduction subject to the budget constraint.
+- **Output**: the exact-optimal set of (asset, control) actions, `total_cost_usd`, `total_risk_reduction_usd`, `residual_eal_usd`, and a `greedy_comparison` showing the dollar value gained over a naive "sort by ROSI and take greedily" baseline.
 
-## Outputs (`backend/outputs/`)
+Exposed via `GET /controls/optimize?budget=<usd>&one_control_per_asset=<bool>`.
 
-| File | Contents |
+## AI Chat Assistant
+
+`api/chat.py` implements a RAG-style assistant over the live risk data:
+
+- On every request, it rebuilds context from the org/business-unit/asset/control parquet outputs (top 15 assets by EAL, top 10 controls by ROSI) and injects it into the system prompt.
+- If the user's message contains a budget figure (e.g. *"if I allocate $750k..."*), it **runs the real ILP optimizer** (the same function backing `/controls/optimize`) and injects the actual solver output into context — the model is instructed to cite those numbers directly rather than computing budget allocation itself.
+- Responses are generated via the Hugging Face Inference Router (`deepseek-ai/DeepSeek-V4-Flash-0731`), using the OpenAI-compatible `/v1/chat/completions` API.
+
+## Tech Stack
+
+| Layer | Technology |
 |---|---|
-| `asset_risk_summary.parquet` | Per-asset EAL, VaR95, VaR99, criticality, priority score, Loss Exceedance Curve (LEC) |
-| `business_unit_risk_summary.parquet` | Aggregated EAL, VaR95 upper bound, and top risk-driving assets per BU |
-| `org_risk_summary.parquet` | Organization-wide aggregated EAL, VaR95, and VaR99 |
-| `control_scenario_results.parquet` | Every candidate control $\times$ asset pair: cost, EAL before/after, risk reduction, ROSI |
+| Backend API | FastAPI, Pydantic, Uvicorn |
+| Risk engine | NumPy, SciPy, pandas, PyArrow (parquet I/O) |
+| Optimizer | PuLP (ILP / knapsack solver) |
+| Chat / RAG | OpenAI SDK → Hugging Face Inference Router → DeepSeek |
+| Config | python-dotenv |
+| Testing | pytest |
 
----
+## Project Structure
 
-## API Endpoints (`backend/api/`)
+```
+backend/
+├── api/
+│   ├── main.py               # FastAPI app, REST endpoints
+│   └── chat.py                # RAG chat endpoint
+├── risk_engine/
+│   ├── ingest.py
+│   ├── likelihood.py
+│   ├── frequency.py
+│   ├── loss_magnitude.py
+│   ├── simulate.py
+│   ├── investment_optimizer.py
+│   └── pipeline.py            # orchestrates the full run
+├── outputs/                    # generated parquet files
+│   ├── org_risk_summary.parquet
+│   ├── business_unit_risk_summary.parquet
+│   ├── asset_risk_summary.parquet
+│   └── control_scenario_results.parquet
+├── requirements.txt
+└── .env
+```
+
+## Getting Started
+
+### Prerequisites
+- Python 3.10+
+- A Hugging Face API token (`HF_TOKEN`) for the chat assistant
+
+### Installation
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Configure environment
+
+Create `backend/.env`:
+
+```
+HF_TOKEN=your_huggingface_token_here
+```
+
+### Run the risk pipeline
+
+```bash
+python -m risk_engine.pipeline
+```
+
+This generates the parquet files under `outputs/` that the API and chatbot both read from.
+
+### Start the API
+
+```bash
+uvicorn api.main:app --reload
+```
+
+API docs available at `http://localhost:8000/docs`.
+
+## API Reference
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/health` | API status check |
-| `GET` | `/risk/organization` | Top-level enterprise risk metrics (EAL, VaR95, VaR99) |
-| `GET` | `/risk/business-units` | Aggregated risk metrics per business unit |
-| `GET` | `/risk/assets` | Risk summaries for all assets |
-| `GET` | `/risk/assets/{asset_id}` | Detailed asset metrics & Loss Exceedance Curve array |
-| `GET` | `/controls/roi` | All controls ranked by Return on Security Investment |
-| `GET` | `/controls/scenarios` | Full candidate control $\times$ asset simulation results |
-| `GET` | `/controls/optimize?budget=X` | Knapsack ILP optimizer for budget-constrained security investments |
-| `POST` | `/chat` | Conversational AI Copilot grounded in live risk parquet data |
+| `GET` | `/health` | Service health check |
+| `GET` | `/risk/organization` | Top-level enterprise risk metrics |
+| `GET` | `/risk/business-units` | Aggregated risk per business unit |
+| `GET` | `/risk/assets` | Risk metrics for all assets |
+| `GET` | `/risk/assets/{asset_id}` | Detailed risk for one asset (incl. loss exceedance curve) |
+| `GET` | `/controls/scenarios` | All control what-if scenarios |
+| `GET` | `/controls/roi` | Controls ranked by overall ROSI |
+| `GET` | `/controls/optimize?budget=<usd>` | Optimal budget allocation (ILP) vs. greedy baseline |
+| `POST` | `/chat` | RAG chat assistant over live risk data |
 
----
+## Environment Variables
 
-## Key Modeling Standards & Credibility
+| Variable | Required | Description |
+|---|---|---|
+| `HF_TOKEN` | Yes | Hugging Face API token used by `api/chat.py` for the chat assistant |
 
-| Model Component | External Standard / Benchmark |
-|---|---|
-| Vulnerability Likelihood | EPSS (FIRST.org Exploit Prediction Scoring System) |
-| Technical Severity | CVSS v3.1 (FIRST.org / NIST NVD) |
-| Risk Framework | Open FAIR™ (The Open Group Standard) |
-| Loss Calibration | IBM / Ponemon Institute Cost of a Data Breach Report |
-| Simulation Method | Vectorized Monte Carlo (Triangular, Beta, Poisson, Lognormal) |
-| Optimization Solver | 0-1 Knapsack Integer Linear Programming (PuLP / COIN-OR CBC) |
+## Model Limitations
 
----
+Documented transparently for auditability:
 
-## Key Dashboard Features
-
-1. **Executive Summary**: Real-time enterprise Expected Annual Loss (EAL), Value at Risk 95% (1-in-20 yr loss threshold), and Value at Risk 99% (catastrophic tail risk).
-2. **Business Unit Risk Breakdown**: Interactive visual comparison of risk exposure across Business Units with VaR upper-bound tooltips.
-3. **Asset Risk Portfolio**: Sortable, searchable asset inventory with visual highlights on top risk contributors and single-asset Loss Exceedance Curve (LEC) drawers.
-4. **Controls ROI Analysis**: Quantified ROSI ranking defense-in-depth mitigations by financial risk reduction per dollar spent.
-5. **Interactive What-If Optimizer**: Knapsack ILP solver that computes optimal asset-to-control allocations for custom budgets ($0 to $2M+) and demonstrates mathematical superiority over greedy heuristics.
-6. **AI Risk Copilot (Chatbot)**: Floating Copilot widget grounded in live FAIR risk parquet data via context injection.
-
----
-
-## All Commands in One Place
-
-### 1. Initial Setup & Dependencies
-
-#### Backend Setup
-```bash
-# Navigate to backend directory
-cd backend
-
-# Create and activate virtual environment
-# Windows (PowerShell):
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-
-# Windows (CMD):
-python -m venv venv
-venv\Scripts\activate.bat
-
-# Linux / macOS:
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env configuration
-# Windows:
-Copy-Item .env.example .env
-# Linux / macOS:
-cp .env.example .env
-```
-
-#### Frontend Setup
-```bash
-# In a new terminal, navigate to frontend directory
-cd frontend
-
-# Install npm dependencies
-npm install
-
-# Create frontend .env configuration
-# Windows:
-Copy-Item .env.example .env
-# Linux / macOS:
-cp .env.example .env
-```
-
----
-
-### 2. Dataset & Risk Pipeline Execution
-
-```bash
-# (Optional) Regenerate simulated telemetry CSVs:
-python scripts/generate_dataset.py
-
-# Run the end-to-end FAIR Monte Carlo risk quantification pipeline:
-python -m risk_engine.pipeline
-
-# Run the automated Pytest test suite:
-python -m pytest tests/ -v
-```
-
----
-
-### 3. Running the Full Stack Application
-
-#### Start Backend Server
-```bash
-# Inside backend/ with venv activated:
-uvicorn api.main:app --reload --port 8000
-```
-- **REST API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
-
-#### Start Frontend Dashboard
-```bash
-# Inside frontend/ directory:
-npm run dev
-```
-- **Live Dashboard**: [http://localhost:5173](http://localhost:5173)
+- **Correlated-loss risk**: the current Monte Carlo simulation treats asset-level loss events as independent; it does not yet model correlated/cascading failure across assets in the same business unit or shared infrastructure.
+- **EPSS/CVSS inputs are point-in-time**: exploit probability and severity scores are as current as the last data refresh; they are not re-pulled live from FIRST.org on every simulation run.
+- **TEF borrowing** for low-history assets uses the business unit's aggregate distribution, which may understate risk for genuinely novel/unique assets with no comparable peers.
+- **Loss magnitude benchmarks** (per-record cost, regulatory penalty) are calibrated against published industry benchmarks (e.g. IBM/Ponemon Cost of a Data Breach) and should be revisited periodically as these benchmarks update.
