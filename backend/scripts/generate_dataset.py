@@ -16,14 +16,14 @@ def generate_assets(num_assets=50):
         # Financial impact if asset is compromised (in USD)
         value = criticality * random.randint(10000, 100000)
         downtime_cost = criticality * random.randint(1000, 5000)
-        
+
         if criticality >= 4:
             sensitivity = random.choice(["Confidential", "Restricted"])
         elif criticality == 3:
             sensitivity = "Internal"
         else:
             sensitivity = "Public"
-            
+
         assets.append({
             "asset_id": f"AST-{1000+i}",
             "hostname": f"host-{random.randint(10,99)}-{business_units[random.randint(0,4)].lower()}.internal",
@@ -37,6 +37,7 @@ def generate_assets(num_assets=50):
         })
     return assets
 
+
 def generate_vulnerabilities(assets, num_vulns=100):
     vulns = []
     cve_list = ["CVE-2021-44228", "CVE-2023-23397", "CVE-2020-1472", "CVE-2019-0708", "CVE-2022-26134"]
@@ -45,12 +46,12 @@ def generate_vulnerabilities(assets, num_vulns=100):
         cvss = round(random.uniform(2.0, 10.0), 1)
         # EPSS Score: Exploit Probability (0 to 1)
         epss = round(random.uniform(0.01, 0.95), 3) if cvss > 5.0 else round(random.uniform(0.001, 0.1), 3)
-        
+
         if cvss < 4.0: severity = "Low"
         elif cvss < 7.0: severity = "Medium"
         elif cvss < 9.0: severity = "High"
         else: severity = "Critical"
-        
+
         vulns.append({
             "vuln_id": f"VULN-{uuid.uuid4().hex[:8]}",
             "asset_id": random.choice(assets)["asset_id"],
@@ -62,6 +63,7 @@ def generate_vulnerabilities(assets, num_vulns=100):
             "discovery_date": (datetime.datetime.now() - datetime.timedelta(days=random.randint(1, 100))).isoformat()
         })
     return vulns
+
 
 def generate_threat_events(assets, num_events=200):
     """
@@ -79,7 +81,7 @@ def generate_threat_events(assets, num_events=200):
     for i in range(num_events):
         attack = random.choice(attack_types)
         action = random.choice(["Blocked", "Allowed", "Alerted"])
-        
+
         # Simulate financial impact variables if the attack succeeded
         downtime_hours = 0
         records_compromised = 0
@@ -88,7 +90,7 @@ def generate_threat_events(assets, num_events=200):
                 downtime_hours = random.randint(4, 72)
             elif attack[2] == "High":
                 records_compromised = random.randint(100, 50000)
-                
+
         events.append({
             "event_id": f"EVT-{uuid.uuid4().hex[:8]}",
             "timestamp": (datetime.datetime.now() - datetime.timedelta(hours=random.randint(1, 720))).isoformat(),
@@ -103,24 +105,48 @@ def generate_threat_events(assets, num_events=200):
         })
     return events
 
+
 def generate_controls():
+    """
+    Security control catalog with GENUINE cost/effectiveness trade-offs.
+
+    Deliberately avoid any single control being both the cheapest AND the
+    most effective — that creates a "dominant" option that always wins,
+    which collapses the budget-constrained optimization into a trivial
+    problem where a greedy sort-by-ROSI heuristic always matches the exact
+    ILP optimum (no real knapsack trade-off ever occurs). With the values
+    below, different budgets should produce different optimal combinations.
+    """
     return [
-        {"control_id": "CTRL-01", "name": "Endpoint Detection & Response (EDR)", "risk_reduction_pct": 0.85, "cost_usd": 50000},
-        {"control_id": "CTRL-02", "name": "Multi-Factor Authentication (MFA)", "risk_reduction_pct": 0.95, "cost_usd": 20000},
-        {"control_id": "CTRL-03", "name": "Network Segmentation", "risk_reduction_pct": 0.70, "cost_usd": 80000},
-        {"control_id": "CTRL-04", "name": "Regular Patching Program", "risk_reduction_pct": 0.80, "cost_usd": 30000},
+        {"control_id": "CTRL-01", "name": "Endpoint Detection & Response (EDR)", "risk_reduction_pct": 0.75, "cost_usd": 45000},
+        {"control_id": "CTRL-02", "name": "Multi-Factor Authentication (MFA)", "risk_reduction_pct": 0.60, "cost_usd": 15000},
+        {"control_id": "CTRL-03", "name": "Network Segmentation", "risk_reduction_pct": 0.90, "cost_usd": 95000},
+        {"control_id": "CTRL-04", "name": "Regular Patching Program", "risk_reduction_pct": 0.55, "cost_usd": 18000},
+        {"control_id": "CTRL-05", "name": "Security Information & Event Management (SIEM)", "risk_reduction_pct": 0.80, "cost_usd": 65000},
     ]
+
 
 def generate_asset_controls(assets, controls):
     """
     Creates a mapping of which controls are CURRENTLY deployed on which assets.
     This provides the baseline for residual risk calculation and future optimization.
+
+    Deployment likelihood scales with asset criticality (higher-criticality
+    assets are more likely to already have some controls deployed) rather
+    than being purely uniform-random — this is more realistic (important
+    systems tend to get attention first) and avoids an unrealistically flat
+    deployment pattern across the whole asset base.
     """
     deployed_controls = []
     for asset in assets:
-        # Randomly deploy 0 to 3 controls per asset
-        num_controls = random.randint(0, 3)
-        selected_controls = random.sample(controls, num_controls)
+        # Base probability that each individual control is already deployed
+        # on this asset, scaled by criticality (1 -> ~0.08, 5 -> ~0.40).
+        deploy_probability = 0.08 * asset["criticality"]
+
+        selected_controls = [
+            ctrl for ctrl in controls if random.random() < deploy_probability
+        ]
+
         for ctrl in selected_controls:
             deployed_controls.append({
                 "mapping_id": f"MAP-{uuid.uuid4().hex[:8]}",
@@ -130,6 +156,7 @@ def generate_asset_controls(assets, controls):
                 "deployment_date": (datetime.datetime.now() - datetime.timedelta(days=random.randint(30, 365))).isoformat()
             })
     return deployed_controls
+
 
 def main():
     assets = generate_assets(50)
@@ -150,31 +177,39 @@ def main():
         "asset_controls": asset_controls
     }
 
-    output_dir = Path("c:/Users/Kshitij/Desktop/SIH/data")
+    PROJECT_ROOT = Path(__file__).resolve().parents[1]
+    output_dir = PROJECT_ROOT / "data"
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     import csv
-    
+
     def write_csv(filename, data_list):
-        if not data_list: return
+        if not data_list:
+            return
         file_path = output_dir / filename
         with open(file_path, "w", newline='') as f:
             writer = csv.DictWriter(f, fieldnames=data_list[0].keys())
             writer.writeheader()
             writer.writerows(data_list)
-            
+
     write_csv("assets.csv", assets)
     write_csv("vulnerabilities.csv", vulns)
     write_csv("threat_events.csv", events)
     write_csv("controls.csv", controls)
     write_csv("asset_controls.csv", asset_controls)
-        
+
+    # Also write the compiled JSON (kept for reference/inspection; the CSVs
+    # remain the single source of truth consumed by risk_engine).
+    with open(output_dir / "compiled_risk_dataset.json", "w") as f:
+        json.dump(dataset, f, indent=2, default=str)
+
     print(f"Dataset successfully compiled and saved as CSV files in {output_dir}")
     print(f"Total Assets: {len(assets)}")
     print(f"Total Vulnerabilities: {len(vulns)}")
     print(f"Total Threat Events: {len(events)}")
     print(f"Total Controls: {len(controls)}")
     print(f"Total Asset-Control Mappings: {len(asset_controls)}")
+
 
 if __name__ == "__main__":
     main()
